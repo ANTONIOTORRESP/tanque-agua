@@ -1,0 +1,11 @@
+# Firebase config
+.firebaserc
+firebase-debug.log
+
+# Editor files
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
