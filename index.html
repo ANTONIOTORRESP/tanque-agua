@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Control de Tanque 💧</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+    h1 {
+      margin: 20px 0 40px 0;
+      font-size: 2.8rem;
+      text-shadow: 0 0 20px rgba(0, 191, 255, 0.8);
+      letter-spacing: 2px;
+    }
+    .main-container {
+      display: flex;
+      gap: 30px;
+      align-items: flex-start;
+      position: relative;
+      margin-bottom: 50px;
+    }
+    .tank-with-pump {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .pump-motor {
+      position: relative;
+      width: 120px;
+      height: 140px;
+      z-index: 10;
+    }
+    .motor-body {
+      width: 100px;
+      height: 80px;
+      background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+      border-radius: 15px;
+      position: relative;
+      margin: 0 auto;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 2px 5px rgba(255, 255, 255, 0.1);
+      border: 3px solid #555;
+    }
+    .motor-top {
+      width: 60px;
+      height: 30px;
+      background: linear-gradient(145deg, #666, #444);
+      border-radius: 10px 10px 0 0;
+      position: absolute;
+      top: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 2px solid #555;
+    }
+    .motor-light {
+      width: 12px;
+      height: 12px;
+      background: #ff3333;
+      border-radius: 50%;
+      position: absolute;
+      top: 20px;
+      right: 15px;
+      box-shadow: 0 0 10px #ff3333;
+      transition: all 0.3s;
+    }
+    .motor-light.active {
+      background: #00ff00;
+      box-shadow: 0 0 20px #00ff00, 0 0 30px #00ff00;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .outlet-pipe {
+      width: 20px;
+      height: 60px;
+      background: linear-gradient(to bottom, #888, #555);
+      position: absolute;
+      bottom: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 0 0 5px 5px;
+      border: 2px solid #444;
+    }
+    .water-stream {
+      position: absolute;
+      bottom: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      display: none;
+      z-index: 5;
+    }
+    .water-stream.active {
+      display: block;
+    }
+    .water-drop {
+      width: 8px;
+      height: 25px;
+      background: linear-gradient(to bottom, #00d4ff, #0088cc);
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+      position: absolute;
+      animation: waterFall 0.8s linear infinite;
+      box-shadow: 0 0 8px rgba(0, 212, 255, 0.8);
+    }
+    .water-drop:nth-child(1) { animation-delay: 0s; }
+    .water-drop:nth-child(2) { animation-delay: 0.2s; }
+    .water-drop:nth-child(3) { animation-delay: 0.4s; }
+    .water-drop:nth-child(4) { animation-delay: 0.6s; }
+    @keyframes waterFall {
+      0% { top: 0; opacity: 1; }
+      100% { top: 380px; opacity: 0.3; }
+    }
+    .tank-system {
+      display: flex;
+      gap: 20px;
+      align-items: flex-end;
+      position: relative;
+    }
+    .tank-container {
+      position: relative;
+      width: 280px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 4px solid #00bfff;
+      border-radius: 20px 20px 10px 10px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0, 191, 255, 0.2);
+      backdrop-filter: blur(10px);
+    }
+    .water-level {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      background: linear-gradient(to top, #0066cc, #00aaff, #00d4ff);
+      transition: height 1.5s ease-out;
+      box-shadow: 0 -5px 30px rgba(0, 212, 255, 0.6);
+    }
+    .water-surface {
+      position: absolute;
+      top: -3px;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.3);
+      animation: wave 2s ease-in-out infinite;
+    }
+    @keyframes wave {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(5px); }
+    }
+    .bubbles-container {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    .bubble {
+      position: absolute;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.3));
+      border-radius: 50%;
+      animation: rise 3s ease-in infinite;
+    }
+    @keyframes rise {
+      0% { bottom: 0; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { bottom: 100%; opacity: 0; }
+    }
+    .percentage-bar {
+      width: 60px;
+      height: 400px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 5px 0;
+    }
+    .percentage-mark {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: #00d4ff;
+      text-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+    }
+    .mark-line {
+      width: 15px;
+      height: 2px;
+      background: #00d4ff;
+      box-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+    }
+    .faucet-system {
+      position: absolute;
+      bottom: 0;
+      left: -80px;
+      width: 70px;
+      z-index: 5;
+    }
+    .faucet {
+      width: 60px;
+      height: 50px;
+      background: linear-gradient(145deg, #c0c0c0, #808080);
+      border-radius: 8px;
+      position: relative;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+      border: 2px solid #999;
+    }
+    .faucet-connection {
+      width: 25px;
+      height: 20px;
+      background: linear-gradient(to right, #a0a0a0, #707070);
+      position: absolute;
+      top: 50%;
+      right: -25px;
+      transform: translateY(-50%);
+      border: 2px solid #888;
+      border-left: none;
+    }
+    .faucet-pipe {
+      width: 25px;
+      height: 40px;
+      background: linear-gradient(to right, #a0a0a0, #707070);
+      position: absolute;
+      bottom: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 0 0 8px 8px;
+      border: 2px solid #888;
+    }
+    .faucet-handle {
+      width: 35px;
+      height: 15px;
+      background: linear-gradient(to bottom, #4a90e2, #2e5c8a);
+      border-radius: 8px;
+      position: absolute;
+      top: 20px;
+      right: -40px;
+      border: 2px solid #1e3a5f;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s;
+      transform-origin: left center;
+    }
+    .faucet-handle.active {
+      transform: rotate(90deg);
+    }
+    .faucet-drops {
+      position: absolute;
+      bottom: -35px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      display: none;
+    }
+    .faucet-drops.active {
+      display: block;
+    }
+    .faucet-drop {
+      width: 10px;
+      height: 15px;
+      background: linear-gradient(to bottom, #00d4ff, #0088cc);
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+      position: absolute;
+      animation: dropFall 1.2s ease-in infinite;
+      box-shadow: 0 0 5px rgba(0, 212, 255, 0.8);
+    }
+    .faucet-drop:nth-child(1) { animation-delay: 0s; }
+    .faucet-drop:nth-child(2) { animation-delay: 0.4s; }
+    .faucet-drop:nth-child(3) { animation-delay: 0.8s; }
+    @keyframes dropFall {
+      0% { top: 0; opacity: 1; transform: translateX(-50%) scale(1); }
+      100% { top: 100px; opacity: 0; transform: translateX(-50%) scale(0.5); }
+    }
+    .info-panel {
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #00bfff;
+      border-radius: 15px;
+      padding: 25px 40px;
+      margin-top: 30px;
+      box-shadow: 0 0 30px rgba(0, 191, 255, 0.4);
+      backdrop-filter: blur(10px);
+    }
+    .status-row {
+      display: flex;
+      gap: 50px;
+      align-items: center;
+      justify-content: center;
+    }
+    .status-item {
+      text-align: center;
+    }
+    .status-label {
+      font-size: 1rem;
+      color: #00d4ff;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .status-value {
+      font-size: 2.5rem;
+      font-weight: bold;
+      text-shadow: 0 0 15px currentColor;
+    }
+    .status-value.level {
+      color: #00ff88;
+    }
+    .status-value.pump-on {
+      color: #00ff00;
+      animation: glow 1.5s ease-in-out infinite;
+    }
+    .status-value.pump-off {
+      color: #ff3333;
+    }
+    @keyframes glow {
+      0%, 100% { text-shadow: 0 0 15px currentColor; }
+      50% { text-shadow: 0 0 25px currentColor, 0 0 35px currentColor; }
+    }
+    @media (max-width: 768px) {
+      h1 { font-size: 2rem; margin: 15px 0 25px 0; }
+      .main-container { flex-direction: column; align-items: center; gap: 20px; }
+      .tank-with-pump { order: 1; }
+      .tank-container { width: 220px; height: 320px; }
+      .percentage-bar { height: 320px; width: 50px; }
+      .pump-motor { width: 100px; height: 120px; }
+      .motor-body { width: 85px; height: 70px; }
+      .outlet-pipe { height: 50px; bottom: -50px; }
+      @keyframes waterFall { 0% { top: 0; opacity: 1; } 100% { top: 300px; opacity: 0.3; } }
+      .faucet-system { bottom: 0; left: -70px; }
+      .faucet { width: 50px; height: 45px; }
+      .faucet-connection { width: 20px; height: 18px; right: -20px; }
+      .faucet-handle { width: 25px; height: 10px; left: -30px; }
+      .faucet-pipe { width: 18px; height: 30px; bottom: -30px; }
+      .info-panel { padding: 20px 25px; }
+      .status-row { flex-direction: column; gap: 25px; }
+      .status-value { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>💧 Sistema de Control de Tanque</h1>
+  <div class="main-container">
+    <div class="tank-with-pump">
+      <div class="pump-motor">
+        <div class="motor-top"></div>
+        <div class="motor-body">
+          <div class="motor-light" id="motorLight"></div>
+        </div>
+        <div class="outlet-pipe"></div>
+        <div class="water-stream" id="waterStream">
+          <div class="water-drop"></div>
+          <div class="water-drop"></div>
+          <div class="water-drop"></div>
+          <div class="water-drop"></div>
+        </div>
+      </div>
+      <div class="tank-system">
+        <div class="faucet-system">
+          <div class="faucet">
+            <div class="faucet-connection"></div>
+            <div class="faucet-handle" id="faucetHandle"></div>
+            <div class="faucet-pipe"></div>
+          </div>
+          <div class="faucet-drops" id="faucetDrops">
+            <div class="faucet-drop"></div>
+            <div class="faucet-drop"></div>
+            <div class="faucet-drop"></div>
+          </div>
+        </div>
+        <div class="tank-container">
+          <div class="water-level" id="waterLevel">
+            <div class="water-surface"></div>
+          </div>
+          <div class="bubbles-container" id="bubblesContainer"></div>
+        </div>
+        <div class="percentage-bar">
+          <div class="percentage-mark"><div class="mark-line"></div><span>100%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>90%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>80%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>70%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>60%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>50%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>40%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>30%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>20%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>10%</span></div>
+          <div class="percentage-mark"><div class="mark-line"></div><span>0%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="info-panel">
+      <div class="status-row">
+        <div class="status-item">
+          <div class="status-label">Nivel del Tanque</div>
+          <div class="status-value level" id="levelValue">0%</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Estado de Bomba</div>
+          <div class="status-value pump-off" id="pumpValue">OFF</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyB4sAJN6tb-yGiMG6npI_T0NDAolXJHrKU",
+      authDomain: "tanque-dfc1d.firebaseapp.com",
+      databaseURL: "https://tanque-dfc1d-default-rtdb.firebaseio.com",
+      projectId: "tanque-dfc1d",
+      storageBucket: "tanque-dfc1d.appspot.com",
+      messagingSenderId: "385904276945",
+      appId: "1:385904276945:web:b9ffc73a36083b3f60826e"
+    };
+
+    // Inicializar Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    // Autenticación anónima para lectura
+    firebase.auth().signInAnonymously().catch(error => {
+      console.error("Error en autenticación anónima:", error);
+    });
+
+    // Actualizar datos desde Firebase
+    function updateData() {
+      firebase.database().ref("tanque/actual").on("value", (snapshot) => {
+        const datos = snapshot.val();
+        if (datos) {
+          const pct = datos.nivel;
+          const isOn = datos.estado_bomba;
+          document.getElementById('waterLevel').style.height = pct + '%';
+          document.getElementById('levelValue').textContent = pct.toFixed(1) + '%';
+          document.getElementById('motorLight').classList.toggle('active', isOn);
+          document.getElementById('waterStream').classList.toggle('active', isOn);
+          document.getElementById('pumpValue').textContent = isOn ? 'ON' : 'OFF';
+          document.getElementById('pumpValue').className = `status-value pump-${isOn ? 'on' : 'off'}`;
+          document.getElementById('faucetHandle').classList.toggle('active', !isOn);
+          document.getElementById('faucetDrops').classList.toggle('active', !isOn);
+        }
+      });
+    }
+
+    // Generar burbujas
+    function createBubble() {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      const size = Math.random() * 8 + 4;
+      bubble.style.width = size + 'px';
+      bubble.style.height = size + 'px';
+      bubble.style.left = Math.random() * 90 + 5 + '%';
+      bubble.style.animationDuration = (Math.random() * 2 + 2) + 's';
+      bubble.style.animationDelay = Math.random() * 1 + 's';
+      document.getElementById('bubblesContainer').appendChild(bubble);
+      setTimeout(() => bubble.remove(), 5000);
+    }
+    setInterval(createBubble, 300);
+
+    // Iniciar actualización de datos
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        updateData();
+      }
+    });
+  </script>
+</body>
+</html>
